@@ -1,9 +1,6 @@
 import type {
-  TaskMeta,
-  PlanResult,
-  ExecutionResult,
-  RollbackResult,
-  TaskStatus,
+  TaskMeta, PlanResult, ExecutionResult, RollbackResult,
+  TaskStatus, Adjustments,
 } from "../types";
 
 const BASE = "/api";
@@ -41,11 +38,11 @@ export const api = {
   submitReview(
     taskId: string,
     action: "approve" | "adjust" | "reject",
-    plan?: unknown
+    adjustments?: Adjustments
   ): Promise<{ task_id: string; status: string }> {
     return request(`/tasks/${taskId}/review`, {
       method: "POST",
-      body: JSON.stringify({ action, plan }),
+      body: JSON.stringify({ action, adjustments }),
     });
   },
 

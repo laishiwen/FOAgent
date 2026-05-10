@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from app.core.config import STORE_DIR
+from core.config import STORE_DIR
 
 
 class TaskStore:
@@ -68,6 +68,27 @@ class TaskStore:
 
     def get_harness_report(self, task_id: str) -> dict:
         return self._read(task_id, "harness_report.json")
+
+    def save_source_schema(self, task_id: str, data: dict):
+        self._write(task_id, "source_schema.json", data)
+
+    def get_source_schema(self, task_id: str) -> dict:
+        return self._read(task_id, "source_schema.json")
+
+    def save_state(self, task_id: str, data: list):
+        self._write(task_id, "state.json", data)
+
+    def get_state(self, task_id: str) -> list:
+        try:
+            return self._read(task_id, "state.json")
+        except FileNotFoundError:
+            return []
+
+    def save_summary(self, task_id: str, data: dict):
+        self._write(task_id, "summary.json", data)
+
+    def get_summary(self, task_id: str) -> dict:
+        return self._read(task_id, "summary.json")
 
     def save_rollback_log(self, task_id: str, data: dict):
         self._write(task_id, "rollback_log.json", data)

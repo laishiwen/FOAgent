@@ -10,9 +10,9 @@ import os
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-from app.services.task_service import TaskService
-from app.services.audit_service import AuditService
-from app.core.logging import get_logger
+from services.task_service import TaskService
+from services.audit_service import AuditService
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -70,19 +70,17 @@ def get_task(task_id):
 
 @app.route("/api/tasks/<task_id>/review", methods=["POST"])
 def submit_review(task_id):
-    """Submit human review results."""
+    """Submit human review: approve, adjust, or reject."""
     body = request.get_json() or {}
     action = body.get("action", "approve")
 
-    if action in ("approve", "adjust", "reject"):
-        from app.storage import TaskStore
+    if action == "adjust":
+        result = svc.adjust_plan(task_id, body.get("adjustments", {}))
+        return jsonify(result)
+
+    if action in ("approve", "reject"):
+        from storage import TaskStore
         store = TaskStore()
-
-        if action == "adjust":
-            adjusted_plan = body.get("plan", {})
-            if adjusted_plan:
-                store.save_plan(task_id, adjusted_plan)
-
         new_status = "approved" if action != "reject" else "failed"
         store.update_status(task_id, new_status)
         return jsonify({"task_id": task_id, "status": new_status})

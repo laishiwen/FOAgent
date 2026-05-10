@@ -1,19 +1,17 @@
 """CLI entry point for the Agent File Organizer.
 
 Usage:
-    python -m app.cli plan /path/to/dir           # Run planning phase
-    python -m app.cli run /path/to/dir             # Run planning + execution
-    python -m app.cli status <task_id>             # Check task status
-    python -m app.cli rollback <task_id>           # Rollback a task
-    python -m app.cli serve                        # Start web server
+    uv run agent-organizer plan /path/to/dir
+    uv run agent-organizer run /path/to/dir
+    uv run agent-organizer serve --port 5050
 """
 
 import argparse
 import json
 import sys
 
-from app.services.task_service import TaskService
-from app.services.audit_service import AuditService
+from services.task_service import TaskService
+from services.audit_service import AuditService
 
 
 def cmd_plan(args):
@@ -68,7 +66,7 @@ def cmd_rollback(args):
 
 
 def cmd_serve(args):
-    from app.server import run_server
+    from server import run_server
     run_server(port=args.port)
 
 

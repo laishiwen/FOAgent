@@ -37,29 +37,25 @@ def scan_parent_dir(data: dict) -> str:
                 continue
             if entry.is_symlink():
                 files.append({
-                    "name": entry.name,
-                    "path": entry.path,
+                    "name": entry.name, "path": entry.path,
                     "extension": os.path.splitext(entry.name)[1].lower(),
                     "size_bytes": entry.stat().st_size,
                     "modified_at": datetime.fromtimestamp(
                         entry.stat().st_mtime, tz=timezone.utc
                     ).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "is_hidden": False,
-                    "is_symlink": True,
+                    "is_hidden": False, "is_symlink": True,
                 })
             elif entry.is_file():
                 ext = os.path.splitext(entry.name)[1].lower()
                 st = entry.stat()
                 files.append({
-                    "name": entry.name,
-                    "path": entry.path,
+                    "name": entry.name, "path": entry.path,
                     "extension": ext,
                     "size_bytes": st.st_size,
                     "modified_at": datetime.fromtimestamp(
                         st.st_mtime, tz=timezone.utc
                     ).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "is_hidden": False,
-                    "is_symlink": False,
+                    "is_hidden": False, "is_symlink": False,
                 })
                 by_extension[ext] = by_extension.get(ext, 0) + 1
             elif entry.is_dir():
@@ -67,9 +63,26 @@ def scan_parent_dir(data: dict) -> str:
     except OSError as e:
         return _err(f"scan failed: {e}")
 
+    files = sorted(files, key=lambda f: f["name"].lower())
+
+    # Assign ordered IDs and build source schema
+    source_schema = {}
+    for i, f in enumerate(files):
+        fid = str(i + 1)
+        f["id"] = fid
+        source_schema[fid] = {
+            "name": f["name"],
+            "path": f["path"],
+            "extension": f["extension"],
+            "kind": f.get("kind", "?"),
+            "size_bytes": f["size_bytes"],
+            "modified_at": f["modified_at"],
+        }
+
     return _ok(
         root_path=root_path,
-        files=sorted(files, key=lambda f: f["name"].lower()),
+        files=files,
+        source_schema=source_schema,
         subdirs=sorted(subdirs, key=lambda d: d.lower()),
         stats={
             "file_count": len(files),

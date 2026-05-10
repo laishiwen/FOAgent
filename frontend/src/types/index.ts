@@ -6,37 +6,26 @@ export interface TaskMeta {
   created_at: string;
 }
 
-export interface FileInfo {
-  name: string;
-  path: string;
-  extension: string;
-  size_bytes: number;
-  modified_at: string;
-  is_hidden: boolean;
-  is_symlink: boolean;
-  kind?: string;
-  mime_type?: string;
-}
-
-export interface ScanResult {
-  success: boolean;
-  error: string | null;
-  root_path: string;
-  files: FileInfo[];
-  subdirs: string[];
-  stats: {
-    file_count: number;
-    subdir_count: number;
-    by_extension: Record<string, number>;
+export interface SourceSchema {
+  [fileId: string]: {
+    name: string;
+    path: string;
+    extension: string;
+    kind: string;
+    size_bytes: number;
+    modified_at: string;
   };
 }
 
 export interface CategoryItem {
   name: string;
   members: string[];
+  member_ids: string[];
+  confidence: number;
 }
 
 export interface MoveItem {
+  file_id: string;
   source_path: string;
   target_path: string;
   category: string;
@@ -47,6 +36,7 @@ export interface PlanResult {
   status: string;
   task_id: string;
   current_files: string[];
+  source_schema: SourceSchema;
   target_structure: {
     root_path: string;
     categories: CategoryItem[];
@@ -55,25 +45,25 @@ export interface PlanResult {
     directories_to_create: string[];
     moves: MoveItem[];
     conflicts: unknown[];
-    needs_review_items: { source_path: string; target_path: string }[];
+    needs_review_items: MoveItem[];
   };
   needs_review: boolean;
   notes: string[];
 }
 
+export interface Adjustments {
+  moves?: { file_id: string; category: string }[];
+  categories?: { old_name: string; new_name: string }[];
+}
+
 export interface ExecutionStep {
   step_id: string;
   step_type: string;
-  sequence?: number;
   status: string;
   command: string;
   source_path: string | null;
   target_path: string;
-  stdout?: string;
-  stderr?: string;
   error?: string;
-  started_at?: string;
-  finished_at?: string;
 }
 
 export interface ExecutionLog {
@@ -119,20 +109,15 @@ export interface ExecutionResult {
     original_count: number;
     moved_count: number;
     missing: string[];
-    extra: string[];
   } | null;
   harness_report: HarnessReport | null;
+  summary?: { verdict: string; pipeline: unknown[] };
 }
 
 export interface RollbackResult {
   status: string;
   task_id: string;
-  rollback_log: {
-    success: boolean;
-    error: string | null;
-    steps: unknown[];
-    cleaned_dirs: string[];
-  };
+  rollback_log: { steps: unknown[]; cleaned_dirs: string[] };
 }
 
 export interface TaskStatus {
@@ -141,11 +126,7 @@ export interface TaskStatus {
   root_path: string;
   dry_run: boolean;
   created_at: string;
-  scan?: { file_count: number; files: string[] };
-  plan_summary?: {
-    categories: number;
-    moves: number;
-    directories_to_create: number;
-  };
+  state?: { step: string; status: string; input: unknown; output: unknown }[];
+  summary?: { verdict: string };
   harness_report?: HarnessReport;
 }

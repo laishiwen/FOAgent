@@ -325,6 +325,21 @@ body {
   }
 }
 
+/* Adjust UI */
+.cat-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cat-header h4 { cursor: pointer; border-bottom: 1px dashed transparent; }
+.cat-header h4:hover { border-bottom-color: #4a90d9; }
+.cat-edit-input { padding: 2px 6px; border: 1px solid #4a90d9; border-radius: 4px; font-size: 14px; width: 180px; }
+.move-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.move-row.row-ok { background: #f0fff0; }
+.move-row.row-warn { background: #fffdf0; }
+.move-row.row-low { background: #fff0f0; }
+.move-select { font-size: 11px; padding: 2px 4px; border: 1px solid #ddd; border-radius: 3px; }
+.adj-tag { font-size: 10px; color: #4a90d9; background: #e8f0fe; padding: 1px 4px; border-radius: 3px; }
+.adjusted-mark { color: #4a90d9; font-size: 11px; }
+.conf-box { background: #f7f8fa; border-radius: 8px; padding: 12px 16px; flex: 1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.confirm-text { font-size: 13px; color: #666; margin: 0; }
+
 @media (max-width: 640px) {
   .checks-grid {
     grid-template-columns: 1fr;
