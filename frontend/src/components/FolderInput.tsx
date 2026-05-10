@@ -1,17 +1,16 @@
 import { useState } from "react";
 
 interface Props {
-  onStart: (rootPath: string, dryRun: boolean) => void;
+  onStart: (rootPath: string) => void;
   loading: boolean;
 }
 
 export default function FolderInput({ onStart, loading }: Props) {
   const [path, setPath] = useState("");
-  const [dryRun, setDryRun] = useState(true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (path.trim()) onStart(path.trim(), dryRun);
+    if (path.trim()) onStart(path.trim());
   };
 
   return (
@@ -30,22 +29,13 @@ export default function FolderInput({ onStart, loading }: Props) {
             {loading ? (
               <>
                 <span className="spinner" />
-                规划中...
+                扫描分类中...
               </>
             ) : (
-              "扫描并规划"
+              "扫描并分类"
             )}
           </button>
         </div>
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={dryRun}
-            onChange={(e) => setDryRun(e.target.checked)}
-            disabled={loading}
-          />
-          Dry-run 模式（仅预览，不实际移动文件）
-        </label>
       </form>
     </div>
   );

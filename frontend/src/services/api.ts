@@ -1,60 +1,79 @@
-import type {
-  TaskMeta, PlanResult, ExecutionResult, RollbackResult,
-  TaskStatus, Adjustments,
-} from "../types";
+import type { ClassifyResult, ProgressEvent } from "../types";
 
 const BASE = "/api";
 
-async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+export interface SSEClassifyResult {
+  result: ClassifyResult | null;
+  error: string | null;
+}
+
+/**
+ * Stream classify progress via SSE (POST → text/event-stream).
+ * Yields ProgressEvent updates, then a final SSEClassifyResult.
+ */
+export async function* classifyStream(
+  rootPath: string
+): AsyncGenerator<ProgressEvent | SSEClassifyResult> {
+  const res = await fetch(`${BASE}/classify`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    ...opts,
+    body: JSON.stringify({ root_path: rootPath }),
   });
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(
-      (body as { error?: string }).error || `HTTP ${res.status}`
-    );
+    throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
   }
-  return res.json();
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      let eventType = "";
+      let data = "";
+
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          eventType = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          data = line.slice(6);
+        } else if (line === "" && data) {
+          // End of event
+          try {
+            const parsed = JSON.parse(data);
+            if (eventType === "progress") {
+              yield parsed as ProgressEvent;
+            } else if (eventType === "result") {
+              yield { result: parsed as ClassifyResult, error: null };
+              return;
+            } else if (eventType === "error") {
+              yield { result: null, error: parsed.error || "未知错误" };
+              return;
+            }
+          } catch {
+            // skip unparseable events
+          }
+          eventType = "";
+          data = "";
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export const api = {
-  createTask(rootPath: string, dryRun: boolean): Promise<TaskMeta> {
-    return request<TaskMeta>("/tasks", {
-      method: "POST",
-      body: JSON.stringify({ root_path: rootPath, dry_run: dryRun }),
-    });
-  },
-
-  runPlanning(taskId: string): Promise<PlanResult> {
-    return request<PlanResult>(`/tasks/${taskId}/plan`, { method: "POST" });
-  },
-
-  getTask(taskId: string): Promise<TaskStatus> {
-    return request<TaskStatus>(`/tasks/${taskId}`);
-  },
-
-  submitReview(
-    taskId: string,
-    action: "approve" | "adjust" | "reject",
-    adjustments?: Adjustments
-  ): Promise<{ task_id: string; status: string }> {
-    return request(`/tasks/${taskId}/review`, {
-      method: "POST",
-      body: JSON.stringify({ action, adjustments }),
-    });
-  },
-
-  executeTask(taskId: string): Promise<ExecutionResult> {
-    return request<ExecutionResult>(`/tasks/${taskId}/execute`, {
-      method: "POST",
-    });
-  },
-
-  rollbackTask(taskId: string): Promise<RollbackResult> {
-    return request<RollbackResult>(`/tasks/${taskId}/rollback`, {
-      method: "POST",
-    });
-  },
+  classifyStream,
 };

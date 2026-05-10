@@ -134,6 +134,95 @@ def export_task(task_id):
         return jsonify({"success": False, "error": "task not found"}), 404
 
 
+# ---- Single-Agent Classification (SSE streaming) ----
+
+@app.route("/api/classify", methods=["POST"])
+def classify_files_stream():
+    """Deep scan + classify with SSE progress streaming.
+
+    Accepts: {"root_path": "/path/to/dir"}
+    Returns: text/event-stream with real-time progress events + final result.
+    """
+    import queue
+    import threading
+
+    from flask import Response
+    from tools.tool_runner import deep_scan_dir
+    from agents import run_classifier
+
+    body = request.get_json() or {}
+    root_path = body.get("root_path", "")
+
+    if not root_path:
+        return jsonify({"success": False, "error": "root_path is required"}), 400
+    if not os.path.isdir(root_path):
+        return jsonify({"success": False, "error": f"path not found: {root_path}"}), 400
+
+    def generate():
+        # Step 1: deep scan (yield progress synchronously, scan is fast)
+        yield _sse("progress", {"phase": "scanning", "current": 0, "total": 1,
+                                "message": "正在深度扫描目录..."})
+        scan_result = json.loads(deep_scan_dir({"root_path": root_path}))
+        if not scan_result.get("success"):
+            yield _sse("error", {"error": scan_result.get("error")})
+            return
+
+        files = scan_result.get("files", [])
+        source_schema = scan_result.get("source_schema", {})
+        dir_tree = scan_result.get("dir_tree", [])
+        stats = scan_result.get("stats", {})
+        yield _sse("progress", {"phase": "scanning", "current": 1, "total": 1,
+                                "message": f"扫描完成，{stats['file_count']} 个文件，准备分类..."})
+
+        # Step 2: classify in background thread, drain queue for real-time progress
+        q: queue.Queue = queue.Queue()
+        result_holder = {}
+
+        def worker():
+            def on_progress(phase, current, total, message):
+                q.put(_sse("progress", {
+                    "phase": phase, "current": current,
+                    "total": total, "message": message,
+                }))
+            try:
+                result_holder["data"] = run_classifier(files, on_progress=on_progress)
+            except Exception as e:
+                result_holder["error"] = str(e)
+            q.put(None)  # sentinel
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+
+        for item in iter(q.get, None):
+            yield item
+
+        t.join()
+
+        if result_holder.get("error"):
+            yield _sse("error", {"error": result_holder["error"]})
+            return
+
+        classification = result_holder.get("data", {})
+        yield _sse("result", {
+            "success": True,
+            "root_path": scan_result["root_path"],
+            "stats": stats,
+            "dir_tree": dir_tree,
+            "source_schema": source_schema,
+            "categories": classification.get("categories", []),
+            "category_order": classification.get("category_order", []),
+            "total_files": classification.get("total_files", 0),
+        })
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"X-Accel-Buffering": "no",
+                             "Cache-Control": "no-cache"})
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 # ---- Production: serve Vite build ----
 
 @app.route("/", defaults={"path": ""})
@@ -150,3 +239,9 @@ def serve_frontend(path: str):
 def run_server(port: int = 5050):
     logger.info("Starting API server on http://localhost:%d", port)
     app.run(host="0.0.0.0", port=port, debug=False)
+
+
+if __name__ == "__main__":
+    import sys
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5050
+    run_server(port)

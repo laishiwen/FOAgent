@@ -92,6 +92,151 @@ def scan_parent_dir(data: dict) -> str:
     )
 
 
+# Directories to exclude from deep scan
+NOISE_DIRS = {
+    "node_modules", ".git", ".svn", ".hg", "__pycache__", ".venv", "venv",
+    ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".next",
+    "dist", "build", "target", ".cache", ".idea", ".vscode", ".DS_Store",
+    "vendor", "bower_components", ".terraform", ".serverless",
+    ".agent-file-organizer",
+}
+
+
+def _make_child_id(parent_id: str, child_index: int) -> str:
+    """Generate hierarchical child ID from parent ID.
+
+    Scheme:
+      Root children: "0-1", "0-2", ...
+      Children of "0-1": "1-1", "1-2", ...
+      Children of "1-1": "1-1-1", "1-1-2", ...
+    """
+    if parent_id.startswith("0-"):
+        prefix = parent_id[2:]
+    else:
+        prefix = parent_id
+    return f"{prefix}-{child_index}"
+
+
+def _parent_id(child_id: str) -> str | None:
+    """Derive parent ID from child ID. Returns None for root-level items."""
+    parts = child_id.rsplit("-", 1)
+    if len(parts) == 1:
+        return None
+    potential = parts[0]
+    if "-" not in potential:
+        if potential == "0":
+            return None
+        return f"0-{potential}"
+    return potential
+
+
+def deep_scan_dir(data: dict) -> str:
+    """Recursively scan directory, assign hierarchical IDs to all files.
+
+    Input: {"root_path": "/path/to/dir"}
+    Output: flat file list with hierarchical IDs + source_schema + directory tree.
+    """
+    root_path = os.path.abspath(data["root_path"])
+    if not os.path.isdir(root_path):
+        return _err("root_path not found or not a directory")
+
+    all_files = []
+    source_schema = {}
+    dir_entries = []  # (id, name, path) for directories
+
+    def scan_dir(dir_path: str, parent_id: str, counter_ref: list):
+        """Recursively scan a directory, mutating all_files / source_schema / dir_entries."""
+        try:
+            entries = sorted(os.scandir(dir_path), key=lambda e: e.name.lower())
+        except PermissionError:
+            return
+
+        idx = 0
+        for entry in entries:
+            name = entry.name
+            if name.startswith(".") or name in NOISE_DIRS:
+                continue
+
+            idx += 1
+            child_id = _make_child_id(parent_id, idx)
+
+            if entry.is_symlink():
+                st = entry.stat()
+                all_files.append({
+                    "id": child_id, "name": name, "path": entry.path,
+                    "extension": os.path.splitext(name)[1].lower(),
+                    "size_bytes": st.st_size,
+                    "modified_at": datetime.fromtimestamp(
+                        st.st_mtime, tz=timezone.utc
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "is_symlink": True, "is_dir": False, "parent_id": parent_id,
+                })
+                source_schema[child_id] = {
+                    "name": name, "path": entry.path,
+                    "extension": os.path.splitext(name)[1].lower(),
+                    "size_bytes": st.st_size,
+                    "modified_at": datetime.fromtimestamp(
+                        st.st_mtime, tz=timezone.utc
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "parent_id": parent_id, "is_dir": False,
+                }
+
+            elif entry.is_dir():
+                dir_entries.append((child_id, name, entry.path))
+                source_schema[child_id] = {
+                    "name": name, "path": entry.path,
+                    "is_dir": True, "parent_id": parent_id,
+                }
+                scan_dir(entry.path, child_id, counter_ref)
+
+            elif entry.is_file():
+                ext = os.path.splitext(name)[1].lower()
+                st = entry.stat()
+                all_files.append({
+                    "id": child_id, "name": name, "path": entry.path,
+                    "extension": ext,
+                    "size_bytes": st.st_size,
+                    "modified_at": datetime.fromtimestamp(
+                        st.st_mtime, tz=timezone.utc
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "is_symlink": False, "is_dir": False, "parent_id": parent_id,
+                })
+                source_schema[child_id] = {
+                    "name": name, "path": entry.path, "extension": ext,
+                    "size_bytes": st.st_size,
+                    "modified_at": datetime.fromtimestamp(
+                        st.st_mtime, tz=timezone.utc
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "parent_id": parent_id, "is_dir": False,
+                }
+
+    scan_dir(root_path, "0", [0])
+
+    # Build extension stats
+    by_extension = {}
+    for f in all_files:
+        ext = f["extension"]
+        by_extension[ext] = by_extension.get(ext, 0) + 1
+
+    # Build directory tree for display
+    dir_tree = [
+        {"id": did, "name": dname, "path": dpath, "parent_id": _parent_id(did)}
+        for did, dname, dpath in dir_entries
+    ]
+
+    return _ok(
+        root_path=root_path,
+        files=all_files,
+        source_schema=source_schema,
+        dir_tree=dir_tree,
+        stats={
+            "file_count": len(all_files),
+            "dir_count": len(dir_entries),
+            "by_extension": by_extension,
+        },
+    )
+
+
 def get_file_info(data: dict) -> str:
     file_path = data["file_path"]
     if not os.path.isfile(file_path):
@@ -365,6 +510,7 @@ def bash_rollback(data: dict) -> str:
 
 TOOLS = {
     "scan_parent_dir": scan_parent_dir,
+    "deep_scan_dir": deep_scan_dir,
     "get_file_info": get_file_info,
     "bash_create_dirs": bash_create_dirs,
     "bash_dry_run_moves": bash_dry_run_moves,
