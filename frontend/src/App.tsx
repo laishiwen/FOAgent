@@ -37,7 +37,7 @@ export default function App() {
         setProgress(event as ProgressEvent);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "未知错误");
+      setError(e instanceof Error ? e.message : "error");
     } finally {
       setLoading(false);
       setProgress(null);
@@ -52,8 +52,8 @@ export default function App() {
   return (
     <div className="container">
       <header className="header">
-        <h1>文件分类整理系统</h1>
-        <span className="header-sub">深度扫描 → 智能分类</span>
+        <h1>file organizer</h1>
+        <span className="header-sub">deep scan / classify</span>
       </header>
 
       {error && (
@@ -64,18 +64,15 @@ export default function App() {
 
       <FolderInput onStart={handleStart} loading={loading} />
 
-      {/* Progress card */}
       {loading && (
         <div className="card">
-          <h2>2. 处理进度</h2>
+          <h2>progress</h2>
           <div className="progress-section">
             <div className="progress-phase">
-              {PHASE_LABELS[phase] || "准备中..."}
-              {progress && (
+              {PHASE_LABELS[phase] || "connecting..."}
+              {progress && progress.total > 0 && (
                 <span className="progress-stats">
-                  {progress.total > 0
-                    ? ` ${progress.current} / ${progress.total}`
-                    : ""}
+                  {progress.current}/{progress.total}
                 </span>
               )}
             </div>
@@ -92,21 +89,20 @@ export default function App() {
             )}
             {!progress && (
               <div className="progress-msg">
-                <span className="spinner" /> 正在连接...
+                <span className="spinner" /> connecting...
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Result card */}
       {result && (
         <div className="card">
-          <h2>3. 分类结果</h2>
+          <h2>results</h2>
           <p className="summary">
-            共扫描 <strong>{result.total_files}</strong> 个文件
-            （{result.stats.dir_count} 个子目录），
-            分为 <strong>{result.categories.length}</strong> 个类别
+            <strong>{result.total_files}</strong> files
+            ({result.stats.dir_count} dirs)
+            / <strong>{result.categories.length}</strong> categories
           </p>
 
           <div className="categories">
@@ -114,7 +110,7 @@ export default function App() {
               <section key={cat.category_name} className="category-group">
                 <div className="cat-header">
                   <h3>{cat.category_name}</h3>
-                  <span className="badge badge-green">{cat.count} 个文件</span>
+                  <span className="badge badge-green">{cat.count}</span>
                 </div>
                 <ul className="file-list">
                   {cat.member_names.map((name, i) => {

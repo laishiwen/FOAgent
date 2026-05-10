@@ -223,6 +223,46 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+# ---- Tool-based Classify (single-file tool calls) ----
+
+@app.route("/api/classify-tool", methods=["POST"])
+def classify_files_tool():
+    """Tool-based classification: LLM calls classify_file tool once per file."""
+    from tools.tool_runner import deep_scan_dir
+    from agents import run_tool_classifier
+
+    body = request.get_json() or {}
+    root_path = body.get("root_path", "")
+
+    if not root_path:
+        return jsonify({"success": False, "error": "root_path is required"}), 400
+    if not os.path.isdir(root_path):
+        return jsonify({"success": False, "error": f"path not found: {root_path}"}), 400
+
+    scan_result = json.loads(deep_scan_dir({"root_path": root_path}))
+    if not scan_result.get("success"):
+        return jsonify({"success": False, "error": scan_result.get("error")}), 500
+
+    files = scan_result.get("files", [])
+    source_schema = scan_result.get("source_schema", {})
+    dir_tree = scan_result.get("dir_tree", [])
+    stats = scan_result.get("stats", {})
+
+    classification = run_tool_classifier(files)
+
+    return jsonify({
+        "success": True,
+        "root_path": scan_result["root_path"],
+        "stats": stats,
+        "dir_tree": dir_tree,
+        "source_schema": source_schema,
+        "categories": classification.get("categories", []),
+        "category_order": classification.get("category_order", []),
+        "total_files": classification.get("total_files", 0),
+        "llm_turns": classification.get("llm_turns", 0),
+    })
+
+
 # ---- Production: serve Vite build ----
 
 @app.route("/", defaults={"path": ""})

@@ -7,10 +7,6 @@ export interface SSEClassifyResult {
   error: string | null;
 }
 
-/**
- * Stream classify progress via SSE (POST → text/event-stream).
- * Yields ProgressEvent updates, then a final SSEClassifyResult.
- */
 export async function* classifyStream(
   rootPath: string
 ): AsyncGenerator<ProgressEvent | SSEClassifyResult> {
@@ -49,7 +45,6 @@ export async function* classifyStream(
         } else if (line.startsWith("data: ")) {
           data = line.slice(6);
         } else if (line === "" && data) {
-          // End of event
           try {
             const parsed = JSON.parse(data);
             if (eventType === "progress") {
@@ -58,12 +53,10 @@ export async function* classifyStream(
               yield { result: parsed as ClassifyResult, error: null };
               return;
             } else if (eventType === "error") {
-              yield { result: null, error: parsed.error || "未知错误" };
+              yield { result: null, error: parsed.error || "error" };
               return;
             }
-          } catch {
-            // skip unparseable events
-          }
+          } catch { /* skip */ }
           eventType = "";
           data = "";
         }

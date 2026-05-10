@@ -10,7 +10,7 @@ PROMPT_CHAR_LIMIT = 80
 CHARS_PER_FILE = 35
 
 # Classifier uses larger windows since it processes more files at once
-CLASSIFIER_CHAR_LIMIT = 400
+CLASSIFIER_CHAR_LIMIT = 500
 CLASSIFIER_CHARS_PER_FILE = 50
 
 STORE_DIR = os.path.join(os.path.expanduser("~"), ".agent-file-organizer")

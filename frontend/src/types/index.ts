@@ -39,10 +39,11 @@ export interface ClassifyResult {
     dir_count: number;
     by_extension: Record<string, number>;
   };
-  dir_tree: DirEntry[];
+  dir_tree?: DirEntry[];
   source_schema: SourceSchema;
   categories: CategoryGroup[];
-  category_order: string[];
+  category_order?: string[];
   total_files: number;
+  llm_turns?: number;
   error?: string;
 }

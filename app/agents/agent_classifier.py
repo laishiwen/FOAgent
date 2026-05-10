@@ -91,7 +91,8 @@ def run_classifier(files: list, on_progress: ProgressCallback = None) -> dict:
         _progress("done", 0, 0, "no files")
         return {"categories": [], "category_order": [], "total_files": 0}
 
-    # Phase 1: Bucket and classify
+    # Phase 1: Sort by extension then bucket (same-type files cluster together)
+    files = sorted(files, key=lambda f: (f.get("extension", ""), f["name"].lower()))
     buckets = split_files(files, config.CLASSIFIER_CHAR_LIMIT,
                           config.CLASSIFIER_CHARS_PER_FILE)
     total_buckets = len(buckets)
