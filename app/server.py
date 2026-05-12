@@ -6,6 +6,7 @@ Prod mode: Flask serves the built Vite dist files directly.
 
 import json
 import os
+from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -203,7 +204,11 @@ def classify_files_stream():
             return
 
         classification = result_holder.get("data", {})
-        yield _sse("result", {
+
+        # Save result to timestamped JSON file
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        result_path = os.path.join(root_path, f"classify_result_{ts}.json")
+        result_data = {
             "success": True,
             "root_path": scan_result["root_path"],
             "stats": stats,
@@ -212,7 +217,12 @@ def classify_files_stream():
             "categories": classification.get("categories", []),
             "category_order": classification.get("category_order", []),
             "total_files": classification.get("total_files", 0),
-        })
+        }
+        with open(result_path, "w", encoding="utf-8") as f:
+            json.dump(result_data, f, ensure_ascii=False, indent=2)
+        logger.info("Result saved to %s", result_path)
+
+        yield _sse("result", result_data)
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"X-Accel-Buffering": "no",

@@ -45,10 +45,12 @@ def classify_file(file_id: str, file_name: str, category: str) -> str:
 
 # ---- System prompt ----
 
+# v2: semantic-first, no length cap, generic fallback
+# v1: - 分组名为2-8字中文,不使用通用大类(如'文档''图片')
 SYSTEM_PROMPT = """你是文件分类器.根据文件名和扩展名将每个文件归类到语义化分组.
 
 规则:
-- 分组名为2-8字中文,不使用通用大类(如'文档''图片')
+- 优先使用具体语义命名,不确定时可用通用大类兜底
 - file_id使用原始标识符,不得修改
 - 对每个文件必须调用classify_file工具"""
 

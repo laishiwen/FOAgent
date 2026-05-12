@@ -35,9 +35,11 @@ class MergeOutput(BaseModel):
 
 # ---- System prompts ----
 
+# v2: semantic-first, no length cap, generic fallback
+# v1: '分组名简洁(2-8字中文),不使用通用大类.'
 CLASSIFY_SYSTEM = (
     '根据文件名和扩展名,将每个文件归类到语义化分组.'
-    '分组名简洁(2-8字中文),不使用通用大类.'
+    '优先使用具体语义命名(如CNN课程作业、财务数据),不确定时可用通用大类兜底(如文档、图片、代码).'
     'file_id必须原样使用输入中提供的标识符,不得修改.'
 )
 
