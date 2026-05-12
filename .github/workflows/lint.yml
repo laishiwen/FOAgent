@@ -1,0 +1,83 @@
+name: Lint and Format Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  python-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: ./app
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black pylint mypy
+
+      - name: Run Flake8
+        working-directory: ./app
+        run: flake8 . --max-line-length=120 --extend-ignore=E203,W503
+        continue-on-error: true
+
+      - name: Run Black (check only)
+        working-directory: ./app
+        run: black --check .
+        continue-on-error: true
+
+      - name: Run Pylint
+        working-directory: ./app
+        run: pylint app --disable=C0111,C0103,R0903
+        continue-on-error: true
+
+  typescript-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "pnpm"
+          cache-dependency-path: "frontend/pnpm-lock.yaml"
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: pnpm install
+
+      - name: Run ESLint
+        working-directory: ./frontend
+        run: pnpm lint
+        continue-on-error: true
+
+  markdown-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install markdownlint-cli
+        run: npm install -g markdownlint-cli
+
+      - name: Run markdownlint
+        run: markdownlint '**/*.md' --ignore node_modules
+        continue-on-error: true
